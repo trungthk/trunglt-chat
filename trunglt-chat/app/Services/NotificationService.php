@@ -2,13 +2,22 @@
 
 namespace App\Services;
 
+use App\Repositories\NotificationRepository;
+use App\Jobs\SendNotificationJob;
+
 class NotificationService
 {
-    /**
-     * Create a new class instance.
-     */
-    public function __construct()
+    protected $notifications;
+
+    public function __construct(NotificationRepository $notifications)
     {
-        //
+        $this->notifications = $notifications;
+    }
+
+    public function notify(array $data)
+    {
+        $notification = $this->notifications->create($data);
+        dispatch(new SendNotificationJob($notification));
+        return $notification;
     }
 }

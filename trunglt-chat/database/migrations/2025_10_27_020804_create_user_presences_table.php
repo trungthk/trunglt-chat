@@ -11,13 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('messages', function (Blueprint $table) {
+        Schema::create('user_presences', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('channel_id')->constrained()->onDelete('cascade');
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
-            $table->text('content')->nullable();
-            $table->enum('type', ['text', 'image', 'file', 'video']);
-            $table->string('media_url')->nullable();
+            $table->enum('status', ['online', 'offline', 'away'])->default('offline');
+            $table->timestamp('last_seen_at')->nullable();
             $table->timestamps();
         });
     }
@@ -27,6 +25,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('messages');
+        Schema::dropIfExists('user_presences');
     }
 };

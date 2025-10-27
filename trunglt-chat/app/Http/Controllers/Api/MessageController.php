@@ -3,52 +3,69 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Message;
-use App\Models\Channel;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
+use App\Services\MessageService;
 use App\Events\MessageSent;
+use App\Jobs\ProcessMessageAttachments;
+use Illuminate\Support\Facades\Log;
 
 class MessageController extends Controller
 {
-    public function index(Channel $channel)
+    protected $messageService;
+
+    public function __construct(MessageService $messageService)
     {
-        $messages = $channel->messages()->with('user')->latest()->paginate(50);
+        $this->messageService = $messageService;
+    }
+
+    /**
+     * Lấy danh sách tin nhắn trong 1 conversation
+     */
+    public function index($conversationId)
+    {
+        $messages = $this->messageService->getByConversation($conversationId);
         return response()->json($messages);
     }
 
-    public function store(Request $request, Channel $channel)
+    /**
+     * Gửi tin nhắn mới
+     */
+    public function store(Request $request)
     {
-        $validated = $request->validate([
+        $data = $request->validate([
+            'conversation_id' => 'required|exists:conversations,id',
+            'sender_id' => 'required|exists:users,id',
             'content' => 'nullable|string',
-            'type' => 'required|string|in:text,image,file,video',
-            'media_url' => 'nullable|string',
+            'attachments' => 'array',
         ]);
 
-        $message = Message::create([
-            'channel_id' => $channel->id,
-            'user_id' => Auth::id(),
-            'content' => $validated['content'] ?? '',
-            'type' => $validated['type'],
-            'media_url' => $validated['media_url'] ?? null,
-        ]);
+        $message = $this->messageService->create($data);
 
+        // Gửi event socket
         broadcast(new MessageSent($message))->toOthers();
 
-        return response()->json($message, 201);
+        // Đưa vào queue xử lý file đính kèm (nếu có)
+        if (!empty($data['attachments'])) {
+            ProcessMessageAttachments::dispatch($message->id, $data['attachments']);
+        }
+
+        return response()->json([
+            'message' => 'Message sent successfully',
+            'data' => $message
+        ], 201);
     }
 
-    public function update(Request $request, Message $message)
+    /**
+     * Xóa 1 tin nhắn
+     */
+    public function destroy($id)
     {
-        $this->authorize('update', $message);
-        $message->update($request->only('content'));
-        return response()->json($message);
-    }
-
-    public function destroy(Message $message)
-    {
-        $this->authorize('delete', $message);
-        $message->delete();
-        return response()->json(['message' => 'Message deleted']);
+        try {
+            $this->messageService->delete($id);
+            return response()->json(['message' => 'Message deleted']);
+        } catch (\Exception $e) {
+            Log::error('MessageController@destroy: ' . $e->getMessage());
+            return response()->json(['error' => 'Failed to delete message'], 500);
+        }
     }
 }

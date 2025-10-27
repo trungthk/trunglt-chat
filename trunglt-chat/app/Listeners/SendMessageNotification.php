@@ -3,24 +3,26 @@
 namespace App\Listeners;
 
 use App\Events\MessageSent;
-use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Queue\InteractsWithQueue;
+use App\Services\NotificationService;
 
 class SendMessageNotification
 {
-    /**
-     * Create the event listener.
-     */
-    public function __construct()
+    protected $service;
+
+    public function __construct(NotificationService $service)
     {
-        //
+        $this->service = $service;
     }
 
-    /**
-     * Handle the event.
-     */
-    public function handle(MessageSent $event): void
+    public function handle(MessageSent $event)
     {
-        //
+        $this->service->notify([
+            'user_id' => $event->message->channel->user_id,
+            'type' => 'message_received',
+            'data' => [
+                'message_id' => $event->message->id,
+                'content' => $event->message->content,
+            ],
+        ]);
     }
 }

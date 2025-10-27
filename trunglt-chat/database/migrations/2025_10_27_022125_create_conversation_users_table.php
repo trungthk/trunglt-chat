@@ -11,14 +11,15 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('messages', function (Blueprint $table) {
+        Schema::create('conversation_users', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('channel_id')->constrained()->onDelete('cascade');
+            $table->foreignId('conversation_id')->constrained()->onDelete('cascade');
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
-            $table->text('content')->nullable();
-            $table->enum('type', ['text', 'image', 'file', 'video']);
-            $table->string('media_url')->nullable();
+            $table->enum('role', ['member', 'admin'])->default('member');
+            $table->timestamp('joined_at')->nullable();
             $table->timestamps();
+
+            $table->unique(['conversation_id', 'user_id']);
         });
     }
 
@@ -27,6 +28,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('messages');
+        Schema::dropIfExists('conversation_users');
     }
 };
